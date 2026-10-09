@@ -21,6 +21,8 @@ const estado = {
   bonusAtendimento: 0,
   fatosDescobertos: [],
   historicoAtendimento: [],
+  roteiroPopup: null,
+  resultadosAprendizado: [],
   recomendacaoAtendimento: null,
   ultimaQualidade: 'neutra',
   desempenhoCategorias: {},
@@ -34,7 +36,7 @@ const estado = {
   etapa: 'menu'
 };
 
-const CHAVE_PROGRESSO = 'progressoEpavSemIaV1';
+const CHAVE_PROGRESSO = 'progressoEpavPopupV1';
 const CHAVES_PROGRESSO_ANTIGAS = [];
 const CHAVE_PERFIL = 'perfilVendedorEpavSemIa';
 const tutorial = { etapa: 0, observou: false, respondeu: false, perfil: null };
@@ -362,6 +364,7 @@ function temFato(chave) {
 }
 
 function prepararNo(no) {
+  if (no.epavPopup) return window.EpavPopup.preparar(no,estado);
   registrarDescoberta(no.descoberta);
   const retornoAtivo = no.retorno && temFato(no.retorno.chave);
   let texto = no.texto;
@@ -756,6 +759,7 @@ function iniciarJogo() {
     bonusAtendimento: 0,
     fatosDescobertos: [],
     historicoAtendimento: [],
+    roteiroPopup:null, resultadosAprendizado:[],
     recomendacaoAtendimento: null,
     ultimaQualidade: 'neutra',
     desempenhoCategorias: {},
@@ -931,6 +935,7 @@ function iniciarAtendimento(cliente) {
   estado.bonusAtendimento = 0;
   estado.fatosDescobertos = [];
   estado.historicoAtendimento = [];
+  window.EpavPopup.iniciar(estado);
   estado.recomendacaoAtendimento = null;
   document.getElementById('produto-indicado').hidden = true;
   estado.ultimaQualidade = 'neutra';
@@ -973,12 +978,14 @@ function renderizarNo() {
     window.EpavProdutos?.preparar(contextoProdutoAtual());
   }
   const noPreparado = prepararNo(no);
+  salvarProgresso();
+  const narrativa=estado.clienteAtual.dialogo[estado.noAtual]?.epavPopup && estado.roteiroPopup.etapaIndex===0;
   atualizarFaseAtendimento(no.opcoes[0]?.categoria);
   const balaoVendedor = document.getElementById('balao-vendedor');
   balaoVendedor.hidden = true;
   mostrarReacaoCliente(nivelReceptividade() === 'receptivo' ? 'positiva' : nivelReceptividade() === 'fechado' ? 'negativa' : 'neutra', false);
   document.getElementById('vendedor-dialogo').src = imagemVendedor('parado');
-  document.getElementById('nome-falante').textContent = estado.clienteAtual.nome.toUpperCase();
+  document.getElementById('nome-falante').textContent = narrativa ? 'CONTEXTO OBSERVADO' : estado.clienteAtual.nome.toUpperCase();
   atualizarBarraSatisfacao();
   atualizarEstadoConversa();
   atualizarFichaEscuta();
@@ -992,7 +999,7 @@ function renderizarNo() {
 function categoriaProdutoAtual() { return window.EpavMenu.menuStage(estado.clienteAtual,estado.noAtual)?.id || null; }
 function registrosCardapio() { return window.EpavMenu.menuRecords(estado.recomendacaoAtendimento); }
 function registroProdutoAtual() { return registrosCardapio().find(item=>item.categoria===categoriaProdutoAtual() && item.noId===estado.noAtual); }
-function contextoProdutoAtual() { return {cliente_id:estado.clienteAtual.id,no_atual:estado.noAtual,historico:[...estado.historicoAtendimento],categoria:categoriaProdutoAtual()}; }
+function contextoProdutoAtual() { return {roteiro:'popup-v1',cliente_id:estado.clienteAtual.id,no_atual:estado.noAtual,historico:[...estado.historicoAtendimento],categoria:categoriaProdutoAtual()}; }
 function guardarEscolhaProduto(resultado) { estado.recomendacaoAtendimento=window.EpavMenu.saveMenuRecord(estado.recomendacaoAtendimento,resultado); }
 function atualizarResumoCardapio() {
   const elemento=document.getElementById('produto-indicado');
@@ -1013,7 +1020,7 @@ function prepararEscolhaProduto(no) {
     aoConcluir: resultado => {
       guardarEscolhaProduto({ ...resultado, concluido: true });
       atualizarResumoCardapio();
-      salvarProgresso(); renderizarOpcoes(no); sincronizarCronometro();
+      salvarProgresso(); renderizarNo(); sincronizarCronometro();
     }
   });
 }
@@ -1044,6 +1051,7 @@ function renderizarOpcoes(no) {
 
 function escolherOpcao(opcao, botao) {
   if (estado.atendimentoExpulso) return;
+  if (estado.clienteAtual.dialogo[estado.noAtual]?.epavPopup) opcao=window.EpavPopup.escolher(opcao,estado);
   cancelarDigitacao();
   if (Array.isArray(estado.historicoAtendimento)) estado.historicoAtendimento.push({ no_id: estado.noAtual, opcao_id: opcao.id });
   document.querySelectorAll('#opcoes-resposta button').forEach(item => item.disabled = true);
@@ -1054,7 +1062,7 @@ function escolherOpcao(opcao, botao) {
     estado.pontuacaoAtendimento = Math.max(0, estado.pontuacaoAtendimento + pontos);
     estado.decisoesRespondidas += 1;
     if (opcao.correta) estado.acertos += 1;
-    else if (pontos < 0) estado.erros += 1;
+    else if (pontos < 4) estado.erros += 1;
     if (opcao.categoria === 'objecao') {
       estado.objecoesRespondidas += 1;
       if (opcao.correta) estado.objecoesCorretas += 1;
@@ -1161,7 +1169,9 @@ function finalizarAtendimento(expulso = false) {
   pausarTempoAtendimento();
   estado.bonusAtendimento = 0;
   if (expulso) estado.pontuacaoAtendimento = 0;
-  estado.pontuacaoTotal += estado.pontuacaoAtendimento;
+  const nota=window.EpavPopup.resultado(estado);
+  estado.resultadosAprendizado[estado.indiceClienteAtual]=nota;
+  estado.pontuacaoTotal += expulso?0:Math.round(nota.notaGeral*.8);
   estado.satisfacaoAcumulada += estado.satisfacao;
   estado.etapa = 'resultado';
   salvarProgresso();
@@ -1179,6 +1189,8 @@ function mostrarResultadoAtendimento() {
   const pontosAtendimento = document.getElementById('pontos-atendimento');
   pontosAtendimento.textContent = expulso ? '0 pontos · tempo esgotado' : `+${estado.pontuacaoAtendimento} pontos`;
   pontosAtendimento.classList.toggle('encerrado', expulso);
+  const notas=window.EpavPopup.resultado(estado);
+  document.getElementById('notas-aprendizado').textContent=`Diálogo: ${notas.notaDialogos}/100 · Produtos: ${notas.produtosSelecionados ? notas.notaProdutos+'/100' : 'não avaliados'} · Nota geral: ${notas.notaGeral}/100. ${notas.motivo || ''}. ${notas.ressalva}`;
   document.getElementById('forte-atendimento').textContent = avaliacao.forte;
   document.getElementById('cuidado-atendimento').textContent = avaliacao.melhoria;
   document.getElementById('resumo-atendimento').textContent = `${estado.satisfacao}% ${emojiSatisfacao(estado.satisfacao, false)}`;
@@ -1263,7 +1275,7 @@ function finalizarJogo() {
   const avaliacao = avaliarCompetencias();
   document.getElementById('ponto-forte-final').textContent = avaliacao.forte;
   document.getElementById('melhoria-final').textContent = avaliacao.melhoria;
-  document.getElementById('pontuacao-final').textContent = `${estado.pontuacaoTotal}/400 pontos · ${estado.erros} decisões a revisar · tempo ${formatarTempoJogo(estado.tempoJogadoMs)}`;
+  document.getElementById('pontuacao-final').textContent = `${estado.pontuacaoTotal}/400 pontos de aprendizado · 65% diálogo e 35% produtos nos atendimentos completos · tempo ${formatarTempoJogo(estado.tempoJogadoMs)}`;
   document.getElementById('vendedor-final').src = estado.pontuacaoTotal >= 241
     ? imagemVendedor('comemorando') : imagemVendedor('feliz');
   atualizarIdentidadeVendedor();
@@ -1361,6 +1373,7 @@ function salvarTentativa(classificacao, indiceQualidade = null) {
     id,
     data: new Date().toISOString(), pontuacao: estado.pontuacaoTotal, classificacao,
     clientes: clientes.length, erros: estado.erros, acertos: estado.acertos, maximo: 400, versao: 6,
+    maximoDecisoes:clientes.reduce((n,c)=>n+c.decisoes,0), resultadosAprendizado:estado.resultadosAprendizado,
     nomeVendedor: estado.nomeVendedor, sexoVendedor: estado.sexoVendedor,
     tempoJogadoMs: estado.tempoJogadoMs,
     indiceQualidade,
@@ -1385,7 +1398,7 @@ function obterTentativaParaRanking(id = ultimaTentativaId) {
     id: tentativa.id,
     nome: String(tentativa.nomeVendedor || 'Vendedor').trim().slice(0, 20),
     pontos: tentativa.pontuacao,
-    qualidadeQuartos: Math.round((tentativa.indiceQualidade || 0) * 4),
+    qualidadeQuartos: Math.max(0,Math.min(160,Math.round((tentativa.indiceQualidade || 0)/(tentativa.maximoDecisoes || 40)*160))),
     satisfacao: Math.round(tentativa.satisfacaoMedia || 0),
     classificacao: String(tentativa.classificacao || '').slice(0, 40),
     tempoJogadoMs: tentativa.tempoJogadoMs,
@@ -1429,6 +1442,8 @@ function salvarProgresso() {
     bonusAtendimento: estado.bonusAtendimento,
     fatosDescobertos: estado.fatosDescobertos,
     historicoAtendimento: estado.historicoAtendimento,
+    roteiroPopup: estado.roteiroPopup,
+    resultadosAprendizado: estado.resultadosAprendizado,
     recomendacaoAtendimento: estado.recomendacaoAtendimento,
     ultimaQualidade: estado.ultimaQualidade,
     desempenhoCategorias: estado.desempenhoCategorias,
@@ -1497,6 +1512,8 @@ function continuarPartidaSalva() {
     bonusAtendimento: Number(progresso.bonusAtendimento) || 0,
     fatosDescobertos: Array.isArray(progresso.fatosDescobertos) ? progresso.fatosDescobertos : [],
     historicoAtendimento: Array.isArray(progresso.historicoAtendimento) ? progresso.historicoAtendimento : progresso.noAtual === 'd1' ? [] : null,
+    roteiroPopup: progresso.roteiroPopup,
+    resultadosAprendizado: progresso.resultadosAprendizado || [],
     recomendacaoAtendimento: progresso.recomendacaoAtendimento || null,
     ultimaQualidade: progresso.ultimaQualidade || 'neutra',
     desempenhoCategorias: progresso.desempenhoCategorias && typeof progresso.desempenhoCategorias === 'object' ? progresso.desempenhoCategorias : {},
@@ -1552,8 +1569,8 @@ function mostrarHistorico() {
         ? `${tentativa.pontuacao.toLocaleString('pt-BR')}/${tentativa.maximo} pts`
         : `${tentativa.pontuacao.toLocaleString('pt-BR')} pts`;
       const resumoQualidade = Number.isFinite(tentativa.indiceQualidade)
-        ? ` · qualidade ${tentativa.indiceQualidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/40`
-        : Number.isInteger(tentativa.acertos) ? ` · ${tentativa.acertos}/40 corretas` : ' · versão anterior';
+        ? ` · qualidade ${tentativa.indiceQualidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}/${tentativa.maximoDecisoes || 40}`
+        : Number.isInteger(tentativa.acertos) ? ` · ${tentativa.acertos}/${tentativa.maximoDecisoes || 40} corretas` : ' · versão anterior';
       const vendedor = tentativa.nomeVendedor ? `${tentativa.nomeVendedor} · ` : '';
       const campos = [
         ['strong', `Tentativa ${numero}`],
@@ -1600,7 +1617,7 @@ function atualizarResumoMenu() {
   } else if (!historico.length) resumo.textContent = 'Nenhuma missão concluída. Sua primeira negociação começa agora.';
   else {
     const historicoAtual = historico.filter(tentativa => tentativa.maximo === 400);
-    if (!historicoAtual.length) resumo.textContent = 'Nova missão disponível: 5 clientes e 40 decisões para dominar.';
+    if (!historicoAtual.length) resumo.textContent = 'Nova missão disponível: cinco clientes e propostas de refeição para praticar.';
     else {
       const melhor = historicoAtual.reduce((a, b) => b.pontuacao > a.pontuacao ? b : a);
       resumo.textContent = `Melhor resultado: ${melhor.pontuacao}/400 pontos · ${melhor.classificacao} · ${historicoAtual.length} partida(s)`;

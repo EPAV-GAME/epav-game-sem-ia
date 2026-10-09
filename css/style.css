@@ -762,3 +762,4 @@ h1, h2, p { overflow-wrap: anywhere; }
   .produtos-cabecalho .botao { font-size: 12px; padding: 8px; min-height: 44px; }
   .produtos-quantidade { grid-template-columns: 1fr; }
 }
+.produtos-quantidade[hidden], .produtos-paginacao[hidden] { display: none; }

@@ -5,6 +5,7 @@ const MENU_CATEGORIES = [
   {id:'sobremesa', label:'Sobremesa'}
 ];
 function menuStage(client, node) {
+  if (client.dialogo[node]?.epavPopup) return MENU_CATEGORIES.find(c=>c.id===client.dialogo[node].popup) || null;
   const index = Object.keys(client.dialogo).slice(-5).indexOf(node);
   return index < 0 ? null : MENU_CATEGORIES[index];
 }
@@ -22,7 +23,7 @@ function previousMenuChoices(menu, category) {
 function menuSummary(menu) {
   if (menu?.versao !== 2) return menu?.status==='avaliado' ? `Produto indicado: ${menu.nome} · adequação ${menu.avaliacao.score}/1000` : '';
   const chosen=menuRecords(menu).filter(item=>item.status==='avaliado');
-  return chosen.map(item=>`${MENU_CATEGORIES.find(c=>c.id===item.categoria)?.label || item.categoria}: ${item.nome} (${item.avaliacao.score}/1000)`).join(' · ');
+  return chosen.map(item=>`${MENU_CATEGORIES.find(c=>c.id===item.categoria)?.label || item.categoria}: ${item.nome} (${item.avaliacao.nota10 ?? item.avaliacao.score}/${item.avaliacao.nota10!==undefined?10:1000})`).join(' · ');
 }
 
 globalThis.EpavMenu={MENU_CATEGORIES,menuStage,menuRecords,saveMenuRecord,previousMenuChoices,menuSummary};

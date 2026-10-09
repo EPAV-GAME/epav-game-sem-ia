@@ -9,12 +9,17 @@ export function productImageUrl(value) {
 }
 export async function productRequest(path, data, { config, token, signal, fetcher = fetch }) {
   const origin = productServiceUrl(config);
-  if (!['/v1/recomendacoes', '/v1/avaliacoes'].includes(path)) throw new Error('CONFIG');
+  if (!['/v1/recomendacoes', '/v1/avaliacoes','/v2/recomendacoes'].includes(path)) throw new Error('CONFIG');
   if (!token) throw new Error('LOGIN');
   const response = await fetcher(origin + path, { method: 'POST', redirect: 'error', signal,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(data) });
   const result = await response.json();
   if (!response.ok) throw new Error(response.status === 401 ? 'LOGIN' : typeof result.detail === 'string' ? result.detail : 'SERVICE');
+  if(path==='/v2/recomendacoes') {
+    if(result.cliente_id!==data.cliente_id || result.no_atual!==data.no_atual || result.categoria!==data.categoria ||
+       !Array.isArray(result.produtos) || result.produtos.length!==5 || new Set(result.produtos.map(p=>p.codigo)).size!==5 ||
+       result.produtos.some(p=>p.id!==p.codigo || (p.imagem_url!==null && !productImageUrl(p.imagem_url)))) throw new Error('SERVICE');
+  }
   if (path === '/v1/recomendacoes') {
     const count=result.produtos?.length;
     if (!Array.isArray(result.produtos) || new Set(result.produtos.map(p=>p.id)).size !== count) throw new Error('SERVICE');
@@ -42,7 +47,7 @@ export function createRecommendationLoader({ tokenProvider, getConfig, fetcher =
     entry?.controller.abort();
     const active = { key, expires: now() + ttl, controller: new AbortController() };
     entry = active;
-    active.promise = productRequest('/v1/recomendacoes', JSON.parse(payload), {
+    active.promise = productRequest(context.roteiro==='popup-v1'?'/v2/recomendacoes':'/v1/recomendacoes', JSON.parse(payload), {
       config: getConfig(), token, fetcher, signal: active.controller.signal
     }).then(result => {
       if (entry === active) onProducts(result.produtos);

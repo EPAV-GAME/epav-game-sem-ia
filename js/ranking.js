@@ -255,7 +255,7 @@
         const nome = document.createElement('strong');
         nome.textContent = String(dados.nome || 'Vendedor').slice(0, 20);
         const detalhes = document.createElement('small');
-        detalhes.textContent = `Tempo ${formatarTempoJogo(dados.tempoJogadoMs)} · qualidade ${(Number(dados.qualidadeQuartos) / 4).toLocaleString('pt-BR')}/40 · satisfação ${Number(dados.satisfacao) || 0}%`;
+        detalhes.textContent = `Tempo ${formatarTempoJogo(dados.tempoJogadoMs)} · qualidade ${(Number(dados.qualidadeQuartos) / 160 * 100).toLocaleString('pt-BR')}% · satisfação ${Number(dados.satisfacao) || 0}%`;
         jogador.append(nome, detalhes);
         const pontos = document.createElement('span');
         pontos.className = 'ranking-pontos';

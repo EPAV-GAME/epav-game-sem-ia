@@ -3,14 +3,14 @@
   const $ = id => document.getElementById(id);
   const modal = $('modal-produtos');
   let session = null, busy = false, controller = null, clientPromise, loaderPromise;
-  const client = () => clientPromise ||= import('./product-client.mjs?v=20261008-editions');
+  const client = () => clientPromise ||= import('./product-client.mjs?v=20261009-popup');
   const optionCount=window.EPAV_EDITION?.options || 5;
   const menuApi = Promise.resolve(window.EpavMenu);
   const labels = {entrada:'Entrada',principal:'Prato principal',acompanhamento:'Acompanhamento',bebida:'Bebidas',sobremesa:'Sobremesa'};
   const categoryIds = Object.keys(labels);
   const loader = () => loaderPromise ||= client().then(api => api.createRecommendationLoader({
     tokenProvider: () => window.EpavRanking.tokenProdutos(), getConfig: () => window.EPAV_GAME_CONFIG,
-    onProducts: products => products.forEach(product => window.EpavImagens.carregar(product.imagem_url))
+    onProducts: products => products.filter(p=>p.imagem_url).forEach(product => window.EpavImagens.carregar(product.imagem_url))
   }));
   function prepare(context) {
     loader().then(cache => cache.load(context)).catch(() => {});
@@ -40,6 +40,15 @@
   function failure(error, retry) {
     const login = error.message === 'LOGIN';
     if (login) session.repetirDepoisLogin = retry;
+    if(session.contexto.roteiro==='popup-v1') {
+      session.produtos=embaralharOpcoes(window.EpavPopup.cartoes(session.cliente,session.contexto.categoria));
+      session.pagina=0;
+      client().then(api=>{if(session)cards(session.produtos,api);});
+      $('produtos-form').hidden=false;
+      status(login?'Entre para carregar as fotos. Você também pode comparar as cinco opções do roteiro abaixo.':'As fotos estão indisponíveis agora. As cinco opções do roteiro continuam disponíveis para a atividade.');
+      $('produtos-acoes').replaceChildren(button(login?'Entrar para ver as fotos':'Tentar carregar fotos',login?()=>{modal.inert=true;window.EpavRanking.abrirConta({finalidade:'produtos'});}:retry,true));
+      return;
+    }
     status(login ? 'Entre ou crie uma conta para consultar os produtos e receber a avaliação.'
       : error.message === 'CATALOG_QUOTA_EXCEEDED'
         ? 'O banco de produtos atingiu o limite de consultas. Tente novamente quando ele estiver disponível ou continue sem avaliação.'
@@ -56,6 +65,7 @@
     const box = document.createElement('div'); box.className = 'produto-foto';
     const placeholder = document.createElement('span'); placeholder.textContent = 'Carregando foto…'; box.append(placeholder);
     const url = api.productImageUrl(product.imagem_url);
+    if(!url)placeholder.textContent='Foto ainda não disponível';
     if (url) {
       const image = document.createElement('img'); image.width = 512; image.height = 512;
       image.alt = 'Foto de ' + product.nome; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
@@ -68,15 +78,23 @@
     return box;
   }
   function cards(products, api) {
+    $('produtos-paginacao').hidden=session.contexto.roteiro==='popup-v1';
     const fragment = document.createDocumentFragment();
     const start=(session.pagina || 0)*5;
     for (const [offset, product] of products.slice(start,start+5).entries()) {
       const index=start+offset;
       const card = document.createElement('article'); card.className = 'produto-cartao';
+      if(session.contexto.roteiro==='popup-v1') card.onclick=event=>{
+        if(!event.target.closest('details'))chooseFixedProduct(product);
+      };
       const label = document.createElement('label'); label.className = 'produto-selecao';
       const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'produto'; radio.value = product.id;
       radio.checked=session.escolhido===product.id;
-      radio.onchange=()=>{session.escolhido=product.id;$('produto-selecionado').textContent='Selecionado: '+product.nome;};
+      radio.onchange=()=>{
+        session.escolhido=product.id;
+        if(session.contexto.roteiro==='popup-v1') return chooseFixedProduct(product);
+        $('produto-selecionado').textContent='Selecionado: '+product.nome;
+      };
       const title = document.createElement('strong'); title.textContent = `${index + 1}. ${product.nome}`;
       label.append(radio, title); card.append(photo(product, api), label);
       const details = document.createElement('details');
@@ -87,6 +105,14 @@
         const detail = document.createElement('dd'); detail.textContent = value || 'Não informado'; fields.append(term, detail);
       }
       const note = document.createElement('p'); note.className = 'produto-nota'; note.textContent = 'Composição, alergênicos e modo de preparo: confirme no rótulo. As categorias não comprovam essas informações.';
+      if(session.contexto.roteiro==='popup-v1') {
+        const refs=window.EpavPopup.referencias(session.cliente,session.contexto.categoria,product.codigo);
+        const term=document.createElement('dt'),value=document.createElement('dd');
+        term.textContent='Referência financeira histórica';
+        value.textContent=`MC: ${refs.mcPct?.toLocaleString('pt-BR') ?? 'não informada'}% · Massa de margem estimada: ${Number.isFinite(refs.massaMargem)?refs.massaMargem.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):'não informada'}.${refs.destaque?' Destaque na referência desta categoria.':''}`;
+        fields.append(term,value);
+        note.textContent+=' Valores históricos e estimados da planilha, não preços atuais nem relatório contábil oficial. Adequação ao cliente vem antes da margem.';
+      }
       details.append(summary, fields, note); card.append(details); fragment.append(card);
     }
     $('produtos-lista').replaceChildren(fragment);
@@ -105,7 +131,7 @@
     try {
       const result = await (await loader()).load(active.contexto);
       if (session !== active) return;
-      active.produtos = result.produtos;
+      active.produtos = active.contexto.roteiro==='popup-v1'?embaralharOpcoes(result.produtos):result.produtos;
       active.pagina=0;active.escolhido=null;
       $('produto-selecionado').textContent='';
       $('produtos-contexto').textContent = `${active.cliente.perfil} ${result.ficha_escuta.join(' · ')}`;
@@ -114,15 +140,16 @@
         $('produtos-acoes').replaceChildren(button('Continuar conversa',()=>finish({noId:active.contexto.no_atual,status:'sem_catalogo'})));
         return;
       }
-      cards(result.produtos, await client());
+      cards(active.produtos, await client());
       $('produtos-form').reset(); $('produtos-form').hidden = false;
-      status((result.produtos.length<optionCount ? `Esta categoria tem ${result.produtos.length} opção(ões) com foto no catálogo. ` : optionCount+' opções disponíveis. ')+'Consulte as fichas e recomende um produto para esta parte da refeição.');
-      $('produtos-acoes').replaceChildren(button('Não sugerir esta categoria',()=>finish({noId:active.contexto.no_atual,status:'nao_indicado'}),true));
+      status('Cinco opções do roteiro. Consulte a ficha e clique no produto para receber o feedback. Escolher uma proposta não confirma uma compra.');
+      $('produtos-acoes').replaceChildren();
     } catch (error) { if (session === active && error.name !== 'AbortError') failure(error, load); }
     finally { if (session === active) busy = false; }
   }
   async function evaluate(event) {
     event?.preventDefault();
+    if(session?.contexto.roteiro==='popup-v1') return;
     if (!session || busy || !$('produtos-form').reportValidity()) return;
     const active = session;
     const selected = active.produtos.find(p => p.id === active.escolhido);
@@ -143,9 +170,22 @@
     } catch (error) { if (session === active && error.name !== 'AbortError') failure(error, () => evaluate()); }
     finally { if (session === active) { busy = false; $('produto-confirmar').disabled = false; } }
   }
+  function chooseFixedProduct(selected) {
+    if(!session || busy || session.registro?.status==='avaliado') return;
+    busy=true;
+    const feedback=window.EpavPopup.produto(estado,selected.codigo);
+    const evaluation={score:feedback.pontosDaEscolha*100,nota10:feedback.pontosDaEscolha,
+      resumo:feedback.feedbackEducativo,sugestao:feedback.orientacao,criterios:{},informacoes_faltantes:[],
+      indicadoresFinanceiros:feedback.indicadoresFinanceiros};
+    const record={noId:session.contexto.no_atual,categoria:session.contexto.categoria,
+      produtoId:selected.id,codigo:selected.codigo,nome:selected.nome,quantidade:null,
+      status:'avaliado',avaliacao:evaluation};
+    session.registro=record;session.aoAvaliar(record);
+    showResult(record);busy=false;
+  }
   function showResult(record) {
     $('produtos-form').hidden = true; $('produtos-resultado').hidden = false;
-    $('produto-score').textContent = `${record.avaliacao.score}/1000`;
+    $('produto-score').textContent = record.avaliacao.nota10!==undefined?`${record.avaliacao.nota10}/10`:`${record.avaliacao.score}/1000`;
     $('produto-resumo').textContent = `${record.nome}: ${record.avaliacao.resumo}`;
     $('produto-sugestao').textContent = record.avaliacao.sugestao;
     const criteria = document.createDocumentFragment();
@@ -154,8 +194,9 @@
       const paragraph = document.createElement('p'); paragraph.textContent = `${labels[key] || key}: ${value.nota}/100 — ${value.justificativa}`; criteria.append(paragraph);
     }
     $('produto-criterios').replaceChildren(criteria);
+    $('produto-criterios').closest('details').hidden=!Object.keys(record.avaliacao.criterios).length;
     $('produto-faltantes').textContent = record.avaliacao.informacoes_faltantes.length ? 'Ainda é preciso confirmar: ' + record.avaliacao.informacoes_faltantes.join('; ') + '.' : '';
-    status(window.EPAV_EDITION?.evaluation || 'Avaliação de adequação do produto ao cliente.');
+    status(record.avaliacao.nota10!==undefined?'Nota da escolha do produto. A próxima resposta A–D será avaliada separadamente.':window.EPAV_EDITION?.evaluation || 'Avaliação de adequação do produto ao cliente.');
     if(record.avaliacao.perfil_cliente?.descricao) $('produto-faltantes').textContent+=' Perfil considerado: '+record.avaliacao.perfil_cliente.descricao+'.';
     $('produtos-acoes').replaceChildren(button('Continuar conversa', () => finish(record)));
   }
