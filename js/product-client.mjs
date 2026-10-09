@@ -1,4 +1,4 @@
-const SERVICE = 'https://epav-product-evaluator.kevinernandes2012.workers.dev';
+const SERVICE = 'https://epav-rule-evaluator.kevinernandes2012.workers.dev';
 export function productServiceUrl(config) {
   const url = new URL(config?.productServiceUrl || SERVICE);
   if (url.origin !== SERVICE || url.pathname !== '/' || url.username || url.password || url.search || url.hash) throw new Error('CONFIG');
@@ -19,9 +19,9 @@ export async function productRequest(path, data, { config, token, signal, fetche
     const count=result.produtos?.length;
     if (!Array.isArray(result.produtos) || new Set(result.produtos.map(p=>p.id)).size !== count) throw new Error('SERVICE');
     if (data.categoria) {
-      if (result.categoria !== data.categoria || result.quantidade_solicitada !== 10 || count > 10 ||
+      if (result.categoria !== data.categoria || result.quantidade_solicitada !== 5 || count > 5 ||
           !Number.isInteger(result.total_disponiveis) || result.total_disponiveis < count ||
-          count !== Math.min(10,result.total_disponiveis)) throw new Error('SERVICE');
+          count !== Math.min(5,result.total_disponiveis)) throw new Error('SERVICE');
     } else if (count !== 3) throw new Error('SERVICE');
   }
   if (path === '/v1/recomendacoes' && result.produtos.some(p => !productImageUrl(p.imagem_url))) throw new Error('INSUFFICIENT_PRODUCTS');

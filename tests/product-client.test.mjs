@@ -12,7 +12,7 @@ test('tokens go only to the evaluator, never an arbitrary host or redirect', asy
   } });
   assert.equal(request.options.redirect, 'error');
   assert.equal(request.options.headers.Authorization, 'Bearer session');
-  assert.equal(request.url, 'https://epav-product-evaluator.kevinernandes2012.workers.dev/v1/recomendacoes');
+  assert.equal(request.url, 'https://epav-rule-evaluator.kevinernandes2012.workers.dev/v1/recomendacoes');
   assert.equal(productImageUrl('https://example.com/private.png'), null);
 });
 

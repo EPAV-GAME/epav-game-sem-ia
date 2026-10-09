@@ -1,4 +1,13 @@
-# Fechando Negócio — Missão EPAV
+# Fechando Negócio — Missão EPAV · Sem IA
+
+## Versões do projeto
+
+| Versão | Jogo | Avaliação | Opções por categoria |
+|---|---|---|---|
+| Com IA | [Jogar](https://epav-game.github.io/epav-game/) | [API com Groq](https://github.com/EPAV-GAME/epav-product-evaluator) | 10 |
+| Sem IA (este repositório) | [Jogar](https://epav-game.github.io/epav-game-sem-ia/) | [API de regras](https://github.com/EPAV-GAME/epav-rule-evaluator) | 5 |
+
+Os jogos têm progresso e histórico locais separados. Ambos usam a mesma autenticação, fotos e ranking das respostas do diálogo (400 pontos). As avaliações de produtos (0–1000) usam rubricas diferentes e não são diretamente comparáveis. O catálogo e o ranking são compartilhados no Redis; login, gravações e resultados pessoais não são cacheados.
 
 Jogo de atendimento consultivo com progresso e histórico locais. O ranking online é opcional: terminar uma partida **não** a publica automaticamente.
 
@@ -56,11 +65,11 @@ Defina as repository variables `PASSWORD_RESET_SERVICE_URL` e `TURNSTILE_SITE_KE
 
 ## Escolha de produtos durante a conversa
 
-Cada atendimento monta uma refeição em cinco etapas: **entrada, prato principal, acompanhamento, bebidas e sobremesa**. Cada categoria oferece dez alimentos distintos disponíveis no Firebase, com foto e ficha. A seleção usa regras por nome/tipo e sorteio, sem IA; prioriza a ocasião do cliente e reaproveita páginas do catálogo no Redis por até 15 minutos.
+Cada atendimento monta uma refeição em cinco etapas: **entrada, prato principal, acompanhamento, bebidas e sobremesa**. Cada categoria oferece cinco alimentos distintos disponíveis no Firebase, com foto e ficha. A seleção usa regras por nome/tipo e sorteio, sem IA; prioriza a ocasião do cliente e reaproveita páginas do catálogo no Redis por até 15 minutos.
 
-As escolhas ficam entre as últimas cinco falas do diálogo original: Lucas d2–d6, Marina d3–d7, Rafael d4–d8, Camila d5–d9 e André d6–d10. O jogador indica um produto por categoria, informa a quantidade, recebe a avaliação e continua respondendo às opções originais do atendimento. A próxima avaliação leva as indicações anteriores junto ao diálogo e à ficha de escuta. As fichas são reconstruídas pela API a partir dos IDs no Firebase; não usa nomes ou propriedades enviados pelo jogador.
+As escolhas ficam entre as últimas cinco falas do diálogo original: Lucas d2–d6, Marina d3–d7, Rafael d4–d8, Camila d5–d9 e André d6–d10. O jogador indica um produto por categoria, informa a quantidade, recebe a avaliação e continua respondendo às opções originais do atendimento. A próxima avaliação leva as indicações anteriores junto ao diálogo e à ficha de escuta. As fichas são reconstruídas pelo serviço de catálogo a partir dos IDs e do cache Redis; não usa nomes ou propriedades enviados pelo jogador.
 
-O painel apresenta as dez opções em duas páginas de cinco, preservando a escolha ao trocar de página. Categorias sem dez alimentos com foto mostram somente o acervo real; uma categoria vazia pode ser pulada sem impedir a conversa. O jogador também pode decidir não sugerir uma categoria. Cada indicação e sua nota são salvas na retomada; uma avaliação já recebida não chama a Groq novamente ao restaurar a partida. A pontuação original das respostas continua na escala de 400 pontos; a adequação de cada alimento usa a escala independente de 0 a 1000.
+O painel apresenta as cinco opções em uma página. Categorias sem cinco alimentos com foto mostram somente o acervo real; uma categoria vazia pode ser pulada sem impedir a conversa. O jogador também pode decidir não sugerir uma categoria. Cada indicação e sua nota são salvas na retomada; uma avaliação já recebida não solicita novamente a avaliação ao restaurar a partida. A pontuação original das respostas continua na escala de 400 pontos; a adequação de cada alimento usa a escala independente de 0 a 1000.
 
 É necessário entrar ou criar uma conta Firebase para consultar a API. O cronômetro fica parado durante a comparação, autenticação e avaliação. Se o serviço ficar indisponível, o jogador pode tentar novamente ou continuar sem avaliação; o jogo não inventa uma nota. As escolhas anteriores e a avaliação atual são salvas na retomada. Partidas antigas sem histórico detalhado passam a oferecer produtos a partir do próximo atendimento.
 
@@ -84,7 +93,7 @@ O dashboard do painel mostra a quantidade e o espaço ocupado pelas fotos no Clo
 
 ## Cache compartilhado
 
-A consulta pública do ranking usa `GET /v1/ranking` na API `epav-product-evaluator`, com cache Redis de até 30 segundos. Publicar continua gravando no Firebase pelas regras existentes; resultados novos aparecem no ranking após a atualização desse cache. O serviço compartilha também categorias de produtos por 15 minutos e fichas de avaliação por 60 segundos, com invalidação pelo admin e pelo bot. Senhas Redis ficam exclusivamente nos segredos do servidor.
+A consulta pública do ranking usa `GET /v1/ranking` na API `epav-rule-evaluator`, com cache Redis de até 30 segundos. Publicar continua gravando no Firebase pelas regras existentes; resultados novos aparecem no ranking após a atualização desse cache. O serviço compartilha também categorias de produtos por 15 minutos e fichas de avaliação do catálogo compartilhado, com invalidação pelo admin e pelo bot. Senhas Redis ficam exclusivamente nos segredos do servidor.
 
 ## Carregamento das imagens
 
@@ -101,3 +110,9 @@ node --test tests/*.test.mjs
 ```
 
 A redução é do tamanho transferido; o tempo de carregamento também depende da conexão e do dispositivo.
+
+## Pontuação sem IA
+
+A avaliação usa a [API de regras](https://github.com/EPAV-GAME/epav-rule-evaluator), sem Groq ou outro provedor de IA. A rubrica explica categoria, ocasião, praticidade, restrições e quantidade; o resultado inclui o perfil considerado e as confirmações pendentes. Faixas de quantidade são referências de treino, sem promessa nutricional. As cinco opções são sorteadas pelo catálogo a partir das categorias do cenário e exigem foto válida.
+
+Na publicação, os identificadores públicos do app Firebase podem ser configurados como repository variables com os mesmos nomes do workflow. Nenhuma chave privilegiada ou senha é enviada ao navegador.

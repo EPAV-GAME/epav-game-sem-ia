@@ -22,19 +22,19 @@ test('resume preserves each assessment; only completed earlier foods enter the n
   const restored=JSON.parse(JSON.stringify(menu));assert.deepEqual(restored,menu);
   assert.match(menuSummary(restored),/Entrada: Pão/);assert.match(menuSummary(restored),/Prato principal: Carne/);
 });
-test('category responses require ten real distinct options or an explicit smaller inventory',async()=>{
+test('category responses require five real distinct options or an explicit smaller inventory',async()=>{
   const photo='https://epav-swift-images.kevinernandes2012.workers.dev/images/swift/'+'a'.repeat(64)+'.webp';
-  const response=count=>({categoria:'bebida',quantidade_solicitada:10,total_disponiveis:count,produtos:Array.from({length:Math.min(10,count)},(_,i)=>({id:String(i),imagem_url:photo}))});
+  const response=count=>({categoria:'bebida',quantidade_solicitada:5,total_disponiveis:count,produtos:Array.from({length:Math.min(5,count)},(_,i)=>({id:String(i),imagem_url:photo}))});
   const run=data=>productRequest('/v1/recomendacoes',{categoria:'bebida'},{token:'x',fetcher:async()=>({ok:true,json:async()=>data})});
-  for(const count of [0,2,10,30]) assert.equal((await run(response(count))).produtos.length,Math.min(count,10));
+  for(const count of [0,2,10,30]) assert.equal((await run(response(count))).produtos.length,Math.min(count,5));
   await assert.rejects(run({...response(10),categoria:'entrada'}),/SERVICE/);
-  await assert.rejects(run({...response(10),total_disponiveis:9}),/SERVICE/);
+  await assert.rejects(run({...response(10),total_disponiveis:4}),/SERVICE/);
   await assert.rejects(run({...response(10),produtos:Array(10).fill(response(1).produtos[0])}),/SERVICE/);
 });
 test('prefetch keys include category and do not reuse a different menu role',async()=>{
   let calls=0;const photo='https://epav-swift-images.kevinernandes2012.workers.dev/images/swift/'+'a'.repeat(64)+'.webp';
   const loader=createRecommendationLoader({tokenProvider:async()=>'x',getConfig:()=>({}),fetcher:async(url,options)=>{
-    calls++;const request=JSON.parse(options.body);return {ok:true,json:async()=>({categoria:request.categoria,quantidade_solicitada:10,total_disponiveis:1,produtos:[{id:'a',imagem_url:photo}]})};}});
+    calls++;const request=JSON.parse(options.body);return {ok:true,json:async()=>({categoria:request.categoria,quantidade_solicitada:5,total_disponiveis:1,produtos:[{id:'a',imagem_url:photo}]})};}});
   await loader.load({categoria:'entrada'});await loader.load({categoria:'entrada'});assert.equal(calls,1);
   await loader.load({categoria:'sobremesa'});assert.equal(calls,2);
 });

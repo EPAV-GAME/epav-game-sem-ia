@@ -5,7 +5,7 @@ import { readRanking } from '../js/ranking-client.mjs';
 test('ranking uses the cache API and does not send player identity or credentials', async () => {
   const data = [{ nome: 'Jogador', pontos: 120 }];
   const result = await readRanking({ fetcher: async (url, options) => {
-    assert.equal(url, 'https://epav-product-evaluator.kevinernandes2012.workers.dev/v1/ranking');
+    assert.equal(url, 'https://epav-rule-evaluator.kevinernandes2012.workers.dev/v1/ranking');
     assert.equal(options.method, 'GET');
     assert.equal(options.redirect, 'error');
     assert.equal(options.headers, undefined);

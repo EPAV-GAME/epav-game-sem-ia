@@ -34,9 +34,9 @@ const estado = {
   etapa: 'menu'
 };
 
-const CHAVE_PROGRESSO = 'progressoEpavV5';
-const CHAVES_PROGRESSO_ANTIGAS = ['progressoEpavV4', 'progressoEpavV3'];
-const CHAVE_PERFIL = 'perfilVendedorEpav';
+const CHAVE_PROGRESSO = 'progressoEpavSemIaV1';
+const CHAVES_PROGRESSO_ANTIGAS = [];
+const CHAVE_PERFIL = 'perfilVendedorEpavSemIa';
 const tutorial = { etapa: 0, observou: false, respondeu: false, perfil: null };
 let temporizadoresCutscene = [];
 let temporizadorDigitacao = null;
@@ -1367,12 +1367,12 @@ function salvarTentativa(classificacao, indiceQualidade = null) {
     satisfacaoMedia: Math.round(estado.satisfacaoAcumulada / clientes.length),
     desempenhoCategorias: estado.desempenhoCategorias
   });
-  localStorage.setItem('historicoEpav', JSON.stringify(historico));
+  localStorage.setItem('historicoEpavSemIa', JSON.stringify(historico));
   ultimaTentativaId = id;
 }
 
 function lerHistorico() {
-  try { return JSON.parse(localStorage.getItem('historicoEpav') || '[]'); }
+  try { return JSON.parse(localStorage.getItem('historicoEpavSemIa') || '[]'); }
   catch { return []; }
 }
 
@@ -1398,7 +1398,7 @@ function marcarTentativaPublicada(id, uid) {
   const tentativa = historico.find(item => item.id === id);
   if (!tentativa) return;
   tentativa.publicadoPor = uid;
-  localStorage.setItem('historicoEpav', JSON.stringify(historico));
+  localStorage.setItem('historicoEpavSemIa', JSON.stringify(historico));
   if (document.getElementById('tela-historico').classList.contains('ativa')) mostrarHistorico();
 }
 
@@ -1610,7 +1610,7 @@ function atualizarResumoMenu() {
 
 function abrirModalReset() {
   abrirModal('RESETAR HISTÓRICO?', 'Todo o histórico de partidas será apagado.', 'Resetar', () => {
-    localStorage.removeItem('historicoEpav');
+    localStorage.removeItem('historicoEpavSemIa');
     fecharModal();
     mostrarHistorico();
   });
