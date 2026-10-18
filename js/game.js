@@ -1204,7 +1204,8 @@ function finalizarAtendimento(expulso = false) {
   const nota=window.EpavPopup.resultado(estado);
   if (expulso) nota.melhoresEscolhas = false;
   estado.resultadosAprendizado[estado.indiceClienteAtual]=nota;
-  estado.pontuacaoTotal += expulso?0:Math.round(nota.notaGeral*.8);
+  nota.pontosObtidos = expulso ? 0 : nota.notaGeral;
+  estado.pontuacaoTotal += nota.pontosObtidos;
   estado.satisfacaoAcumulada += estado.satisfacao;
   estado.etapa = 'resultado';
   salvarProgresso();
@@ -1252,16 +1253,16 @@ function continuarAposResultado() {
 
 function calcularClassificacao(pontuacao) {
   const feminino = estado.sexoVendedor === 'feminino';
-  if (pontuacao >= 341) return feminino ? 'Mestra do EPAV' : 'Mestre do EPAV';
-  if (pontuacao >= 241) return feminino ? 'Vendedora Destaque' : 'Vendedor Destaque';
-  if (pontuacao >= 121) return feminino ? 'Boa Vendedora' : 'Bom Vendedor';
+  if (pontuacao >= 426) return feminino ? 'Mestra do EPAV' : 'Mestre do EPAV';
+  if (pontuacao >= 301) return feminino ? 'Vendedora Destaque' : 'Vendedor Destaque';
+  if (pontuacao >= 151) return feminino ? 'Boa Vendedora' : 'Bom Vendedor';
   return feminino ? 'Vendedora Iniciante' : 'Vendedor Iniciante';
 }
 
 function mensagemClassificacao(pontuacao) {
-  if (pontuacao >= 341) return 'Você dominou o atendimento. Soube ouvir, argumentar, lidar com objeções e criar valor para o cliente.';
-  if (pontuacao >= 241) return 'Você soube ouvir, entender as necessidades e lidar bem com diferentes situações.';
-  if (pontuacao >= 121) return 'Você conseguiu entender boa parte das necessidades dos clientes e tomar boas decisões.';
+  if (pontuacao >= 426) return 'Você dominou o atendimento. Soube ouvir, argumentar, lidar com objeções e criar valor para o cliente.';
+  if (pontuacao >= 301) return 'Você soube ouvir, entender as necessidades e lidar bem com diferentes situações.';
+  if (pontuacao >= 151) return 'Você conseguiu entender boa parte das necessidades dos clientes e tomar boas decisões.';
   return 'Você começou a entender como funciona um bom atendimento. Agora é hora de praticar mais.';
 }
 
@@ -1287,7 +1288,7 @@ function avaliarCompetencias(mapa = estado.desempenhoCategorias) {
 }
 
 function mereceCutsceneSucesso() {
-  return estado.pontuacaoTotal >= 400 || (estado.resultadosAprendizado.length === clientes.length
+  return estado.pontuacaoTotal >= 500 || (estado.resultadosAprendizado.length === clientes.length
     && clientes.every((_, indice) => estado.resultadosAprendizado[indice]?.melhoresEscolhas === true));
 }
 
@@ -1313,8 +1314,8 @@ function finalizarJogo() {
   const avaliacao = avaliarCompetencias();
   document.getElementById('ponto-forte-final').textContent = avaliacao.forte;
   document.getElementById('melhoria-final').textContent = avaliacao.melhoria;
-  document.getElementById('pontuacao-final').textContent = `${estado.pontuacaoTotal}/400 pontos de aprendizado · 65% diálogo e 35% produtos nos atendimentos completos · tempo ${formatarTempoJogo(estado.tempoJogadoMs)}`;
-  document.getElementById('vendedor-final').src = estado.pontuacaoTotal >= 241
+  document.getElementById('pontuacao-final').textContent = `${estado.pontuacaoTotal}/500 pontos de aprendizado · 65% diálogo e 35% produtos nos atendimentos completos · tempo ${formatarTempoJogo(estado.tempoJogadoMs)}`;
+  document.getElementById('vendedor-final').src = estado.pontuacaoTotal >= 301
     ? imagemVendedor('comemorando') : imagemVendedor('feliz');
   atualizarIdentidadeVendedor();
   salvarTentativa(classificacao, indiceQualidade);
@@ -1331,9 +1332,9 @@ function iniciarCutscene(tipo) {
   const feminino = estado.sexoVendedor === 'feminino';
   const cenario = document.getElementById('cutscene-cenario');
   cenario.className = sucesso ? 'sucesso' : 'fracasso';
-  document.getElementById('cutscene-selo').textContent = sucesso ? 'FINAL PERFEITO DESBLOQUEADO' : 'PONTUAÇÃO MÍNIMA · 0/400';
+  document.getElementById('cutscene-selo').textContent = sucesso ? 'FINAL PERFEITO DESBLOQUEADO' : 'PONTUAÇÃO MÍNIMA · 0/500';
   document.getElementById('cutscene-titulo').textContent = sucesso
-    ? `${estado.sexoVendedor === 'feminino' ? 'Mestra' : 'Mestre'} do EPAV · 400/400`
+    ? `${estado.sexoVendedor === 'feminino' ? 'Mestra' : 'Mestre'} do EPAV · ${estado.pontuacaoTotal}/500`
     : 'Fim da linha!';
   document.getElementById('cutscene-narracao').textContent = sucesso
     ? 'Você não vendeu apenas produtos. Você entendeu pessoas.'
@@ -1360,7 +1361,7 @@ function iniciarCutscene(tipo) {
         'Rafael: “Agora eu sei onde vou procurar da próxima vez.”',
         `Camila: “${feminino ? 'Rápida, objetiva' : 'Rápido, objetivo'} e ainda conseguiu me ajudar.”`,
         `André: “Pode colocar ${feminino ? 'essa vendedora' : 'esse vendedor'} na equipe!”`,
-        `Narrador: ${feminino ? 'MESTRA' : 'MESTRE'} DO EPAV · 400/400 — Você não vendeu apenas produtos. Você entendeu pessoas.`
+        `Narrador: ${feminino ? 'MESTRA' : 'MESTRE'} DO EPAV · ${estado.pontuacaoTotal}/500 — Você não vendeu apenas produtos. Você entendeu pessoas.`
       ]
     : [
         'Lucas: “Você nem tentou entender o que eu precisava.”',
@@ -1410,7 +1411,7 @@ function salvarTentativa(classificacao, indiceQualidade = null) {
   historico.push({
     id,
     data: new Date().toISOString(), pontuacao: estado.pontuacaoTotal, classificacao,
-    clientes: clientes.length, erros: estado.erros, acertos: estado.acertos, maximo: 400, versao: 6,
+    clientes: clientes.length, erros: estado.erros, acertos: estado.acertos, maximo: 500, versao: 7,
     maximoDecisoes:clientes.reduce((n,c)=>n+c.decisoes,0), resultadosAprendizado:estado.resultadosAprendizado,
     nomeVendedor: estado.nomeVendedor, sexoVendedor: estado.sexoVendedor,
     tempoJogadoMs: estado.tempoJogadoMs,
@@ -1430,12 +1431,12 @@ function lerHistorico() {
 function obterTentativaParaRanking(id = ultimaTentativaId) {
   if (!id) return null;
   const tentativa = lerHistorico().find(item => item.id === id);
-  if (!tentativa || tentativa.versao < 6 || tentativa.maximo !== 400
+  if (!tentativa || tentativa.versao < 6 || ![400, 500].includes(tentativa.maximo)
       || !Number.isInteger(tentativa.tempoJogadoMs) || tentativa.tempoJogadoMs < 0) return null;
   return {
     id: tentativa.id,
     nome: String(tentativa.nomeVendedor || 'Vendedor').trim().slice(0, 20),
-    pontos: tentativa.pontuacao,
+    pontos: tentativa.maximo === 500 ? Math.round(tentativa.pontuacao * .8) : tentativa.pontuacao,
     qualidadeQuartos: Math.max(0,Math.min(160,Math.round((tentativa.indiceQualidade || 0)/(tentativa.maximoDecisoes || 40)*160))),
     satisfacao: Math.round(tentativa.satisfacaoMedia || 0),
     classificacao: String(tentativa.classificacao || '').slice(0, 40),
@@ -1456,7 +1457,7 @@ function marcarTentativaPublicada(id, uid) {
 function salvarProgresso() {
   if (estado.etapa === 'menu' || estado.indiceClienteAtual >= clientes.length) return;
   const progresso = {
-    versao: 6,
+    versao: 7,
     salvoEm: new Date().toISOString(),
     etapa: estado.etapa,
     nomeVendedor: estado.nomeVendedor,
@@ -1504,9 +1505,18 @@ function lerProgresso() {
       || 'null';
     const progresso = JSON.parse(bruto);
     const etapasValidas = ['escritorio', 'dialogo', 'resultado'];
-    if (!progresso || ![3, 4, 5, 6].includes(progresso.versao) || !etapasValidas.includes(progresso.etapa)) return null;
+    if (!progresso || ![3, 4, 5, 6, 7].includes(progresso.versao) || !etapasValidas.includes(progresso.etapa)) return null;
     if (!Number.isInteger(progresso.indiceClienteAtual) || progresso.indiceClienteAtual < 0 || progresso.indiceClienteAtual >= clientes.length) return null;
     if (progresso.etapa !== 'escritorio' && !clientes.some(cliente => cliente.id === progresso.clienteId)) return null;
+    if (progresso.versao < 7) {
+      const resultados = progresso.resultadosAprendizado;
+      if (Array.isArray(resultados) && resultados.length) {
+        progresso.pontuacaoTotal = resultados.reduce((soma, nota, indice) => soma + (
+          nota ? (nota.pontosObtidos ?? (progresso.atendimentoExpulso && indice === progresso.indiceClienteAtual
+            ? 0 : nota.notaGeral || 0)) : 0), 0);
+      } else progresso.pontuacaoTotal = Math.round((Number(progresso.pontuacaoTotal) || 0) / .8);
+      progresso.versao = 7;
+    }
     return progresso;
   } catch {
     return null;
@@ -1622,7 +1632,7 @@ function mostrarHistorico() {
         campo.textContent = texto;
         item.appendChild(campo);
       });
-      if (tentativa.id && tentativa.versao >= 6 && tentativa.maximo === 400) {
+      if (tentativa.id && tentativa.versao >= 6 && [400, 500].includes(tentativa.maximo)) {
         const publicar = document.createElement('button');
         publicar.type = 'button';
         publicar.className = 'botao publicar-historico';
@@ -1647,7 +1657,7 @@ function atualizarResumoMenu() {
   if (progresso) {
     const cliente = Math.min(progresso.indiceClienteAtual + 1, clientes.length);
     const pontosEmAndamento = progresso.etapa === 'dialogo' && !progresso.atendimentoExpulso && progresso.roteiroPopup
-      ? Math.round(window.EpavPopupMotor.resultado(progresso.roteiroPopup).notaGeral * .8) : 0;
+      ? window.EpavPopupMotor.resultado(progresso.roteiroPopup).notaGeral : 0;
     const pontosSalvos = Number(progresso.pontuacaoTotal || 0) + pontosEmAndamento;
     const nome = progresso.nomeVendedor ? `${progresso.nomeVendedor} · ` : '';
     const tempoSalvo = Number.isFinite(progresso.tempoJogadoMs)
@@ -1655,11 +1665,11 @@ function atualizarResumoMenu() {
     resumo.textContent = `Partida salva · ${nome}cliente ${cliente}/${clientes.length} · ${pontosSalvos.toLocaleString('pt-BR')} pontos${tempoSalvo}`;
   } else if (!historico.length) resumo.textContent = 'Nenhuma missão concluída. Sua primeira negociação começa agora.';
   else {
-    const historicoAtual = historico.filter(tentativa => tentativa.maximo === 400);
+    const historicoAtual = historico.filter(tentativa => tentativa.maximo === 500);
     if (!historicoAtual.length) resumo.textContent = 'Nova missão disponível: cinco clientes e propostas de refeição para praticar.';
     else {
       const melhor = historicoAtual.reduce((a, b) => b.pontuacao > a.pontuacao ? b : a);
-      resumo.textContent = `Melhor resultado: ${melhor.pontuacao}/400 pontos · ${melhor.classificacao} · ${historicoAtual.length} partida(s)`;
+      resumo.textContent = `Melhor resultado: ${melhor.pontuacao}/500 pontos · ${melhor.classificacao} · ${historicoAtual.length} partida(s)`;
     }
   }
 }

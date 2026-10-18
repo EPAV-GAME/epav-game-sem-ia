@@ -9,7 +9,7 @@ function load(name,next,context) {
   vm.runInContext(source.slice(start,source.indexOf(`function ${next}(`,start)),context);
 }
 
-test('result highlights overall grade while persistence keeps the overall grade on the 400-point scale',()=>{
+test('result highlights overall grade while persistence keeps the overall grade on the 500-point scale',()=>{
   const elements=new Map();
   let saved;
   const c=vm.createContext({
@@ -28,7 +28,7 @@ test('result highlights overall grade while persistence keeps the overall grade 
   c.finalizarAtendimento();
   assert.equal(elements.get('pontos-atendimento').textContent,'+75 pontos');
   assert.equal(saved.resultadosAprendizado[0].notaGeral,75);
-  assert.equal(saved.pontuacaoTotal,60);
+  assert.equal(saved.pontuacaoTotal,75);
   c.estado.atendimentoExpulso=true;
   c.mostrarResultadoAtendimento();
   assert.equal(elements.get('pontos-atendimento').textContent,'0 pontos · tempo esgotado');
@@ -43,6 +43,28 @@ test('success cutscene accepts best available choices for every client and rejec
  assert.equal(c.mereceCutsceneSucesso(),false);
  c.estado.resultadosAprendizado.pop();
  assert.equal(c.mereceCutsceneSucesso(),false);
- c.estado.pontuacaoTotal=400;
+ c.estado.pontuacaoTotal=500;
  assert.equal(c.mereceCutsceneSucesso(),true);
+});
+
+test('saved 97 and 81 grades restore as 178 and do not convert again on subsequent resumes',()=>{
+ let saved={versao:6,etapa:'escritorio',indiceClienteAtual:2,pontuacaoTotal:143,
+  resultadosAprendizado:[{notaGeral:97},{notaGeral:81}]};
+ const c=vm.createContext({clientes:[{id:'c1'},{id:'c2'},{id:'c3'}],CHAVE_PROGRESSO:'save',
+  CHAVES_PROGRESSO_ANTIGAS:[],localStorage:{getItem:()=>JSON.stringify(saved)}});
+ load('lerProgresso','continuarPartidaSalva',c);
+ const migrated=c.lerProgresso();
+ assert.equal(migrated.pontuacaoTotal,178);
+ assert.equal(migrated.versao,7);
+ saved=migrated;
+ assert.equal(c.lerProgresso().pontuacaoTotal,178);
+ saved={...saved,versao:6,etapa:'resultado',clienteId:'c2',indiceClienteAtual:1,atendimentoExpulso:true};
+ assert.equal(c.lerProgresso().pontuacaoTotal,97);
+});
+
+test('ranking alone converts the 500 point total to its shared 400 point scale',()=>{
+ const c=vm.createContext({ultimaTentativaId:'test',lerHistorico:()=>[
+  {id:'test',versao:7,maximo:500,pontuacao:500,tempoJogadoMs:1000} ]});
+ load('obterTentativaParaRanking','marcarTentativaPublicada',c);
+ assert.equal(c.obterTentativaParaRanking().pontos,400);
 });
