@@ -185,7 +185,7 @@ function formatarTempoAtendimento(milissegundos) {
 
 function obterLimiteTempoAtendimentoMs() {
   const segundos = window.EPAV_GAME_CONFIG?.tempoAtendimentoSegundos;
-  return Number.isSafeInteger(segundos * 1000) && segundos > 0 ? segundos * 1000 : 300000;
+  return Number.isSafeInteger(segundos * 1000) && segundos > 0 ? segundos * 1000 : 240000;
 }
 
 function tempoAtendimentoAtualMs() {
@@ -209,9 +209,7 @@ function deveContarTempoAtendimento() {
     && document.getElementById('modal-produtos').hidden
     && Boolean(estado.clienteAtual)
     && !estado.atendimentoExpulso
-    && !jogoPausado
-    && !elementoDigitacao
-    && !proximaAcaoLeitura;
+    && !jogoPausado;
 }
 
 function sincronizarTempoAtendimento() {
@@ -1204,6 +1202,7 @@ function finalizarAtendimento(expulso = false) {
   estado.bonusAtendimento = 0;
   if (expulso) estado.pontuacaoAtendimento = 0;
   const nota=window.EpavPopup.resultado(estado);
+  if (expulso) nota.melhoresEscolhas = false;
   estado.resultadosAprendizado[estado.indiceClienteAtual]=nota;
   estado.pontuacaoTotal += expulso?0:Math.round(nota.notaGeral*.8);
   estado.satisfacaoAcumulada += estado.satisfacao;
@@ -1221,9 +1220,9 @@ function mostrarResultadoAtendimento() {
   document.getElementById('selo-resultado').classList.toggle('encerrado', expulso);
   document.getElementById('titulo-resultado').textContent = expulso ? 'Cliente perdeu a paciência' : titulo;
   const pontosAtendimento = document.getElementById('pontos-atendimento');
-  pontosAtendimento.textContent = expulso ? '0 pontos · tempo esgotado' : `+${estado.pontuacaoAtendimento} pontos`;
-  pontosAtendimento.classList.toggle('encerrado', expulso);
   const notas=window.EpavPopup.resultado(estado);
+  pontosAtendimento.textContent = expulso ? '0 pontos · tempo esgotado' : `+${notas.notaGeral} pontos`;
+  pontosAtendimento.classList.toggle('encerrado', expulso);
   document.getElementById('notas-aprendizado').textContent=`Diálogo: ${notas.notaDialogos}/100 · Produtos: ${notas.produtosSelecionados ? notas.notaProdutos+'/100' : 'não avaliados'} · Nota geral: ${notas.notaGeral}/100. ${notas.motivo || ''}. ${notas.ressalva}`;
   document.getElementById('forte-atendimento').textContent = avaliacao.forte;
   document.getElementById('cuidado-atendimento').textContent = avaliacao.melhoria;
@@ -1287,6 +1286,11 @@ function avaliarCompetencias(mapa = estado.desempenhoCategorias) {
   };
 }
 
+function mereceCutsceneSucesso() {
+  return estado.pontuacaoTotal >= 400 || (estado.resultadosAprendizado.length === clientes.length
+    && clientes.every((_, indice) => estado.resultadosAprendizado[indice]?.melhoresEscolhas === true));
+}
+
 function finalizarJogo() {
   if (partidaConcluida) return;
   pausarTempoJogo();
@@ -1315,7 +1319,7 @@ function finalizarJogo() {
   atualizarIdentidadeVendedor();
   salvarTentativa(classificacao, indiceQualidade);
   localStorage.removeItem(CHAVE_PROGRESSO);
-  if (estado.pontuacaoTotal >= 400) iniciarCutscene('sucesso');
+  if (mereceCutsceneSucesso()) iniciarCutscene('sucesso');
   else if (estado.pontuacaoTotal <= 0) iniciarCutscene('fracasso');
   else mostrarResultadoFinal();
 }
@@ -1390,7 +1394,7 @@ function encerrarCutscene() {
 
 function mostrarResultadoFinal() {
   mostrarTela('tela-final');
-  if (estado.pontuacaoTotal >= 400) {
+  if (mereceCutsceneSucesso()) {
     document.querySelector('.trofeu').animate(
       [{ transform: 'scale(.5) rotate(-12deg)' }, { transform: 'scale(1.2) rotate(8deg)' }, { transform: 'scale(1)' }],
       { duration: 900 }
@@ -1642,7 +1646,8 @@ function atualizarResumoMenu() {
   if (!resumo) return;
   if (progresso) {
     const cliente = Math.min(progresso.indiceClienteAtual + 1, clientes.length);
-    const pontosEmAndamento = progresso.etapa === 'dialogo' ? Number(progresso.pontuacaoAtendimento || 0) : 0;
+    const pontosEmAndamento = progresso.etapa === 'dialogo' && !progresso.atendimentoExpulso && progresso.roteiroPopup
+      ? Math.round(window.EpavPopupMotor.resultado(progresso.roteiroPopup).notaGeral * .8) : 0;
     const pontosSalvos = Number(progresso.pontuacaoTotal || 0) + pontosEmAndamento;
     const nome = progresso.nomeVendedor ? `${progresso.nomeVendedor} · ` : '';
     const tempoSalvo = Number.isFinite(progresso.tempoJogadoMs)

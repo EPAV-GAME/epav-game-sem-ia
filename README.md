@@ -7,7 +7,7 @@
 | Com IA | [Jogar](https://epav-game.github.io/epav-game/) | [API com Groq](https://github.com/EPAV-GAME/epav-product-evaluator) | 10 |
 | Sem IA (este repositório) | [Jogar](https://epav-game.github.io/epav-game-sem-ia/) | [API de regras](https://github.com/EPAV-GAME/epav-rule-evaluator) | 5 |
 
-Os jogos têm progresso e histórico locais separados. Ambos usam a mesma autenticação, fotos e ranking das respostas do diálogo (400 pontos). As avaliações de produtos (0–1000) usam rubricas diferentes e não são diretamente comparáveis. O catálogo e o ranking são compartilhados no Redis; login, gravações e resultados pessoais não são cacheados.
+Os jogos têm progresso e histórico locais separados. Ambos usam a mesma autenticação, fotos e ranking de pontuação na escala de 400 pontos. As avaliações de produtos (0–1000) usam rubricas diferentes e não são diretamente comparáveis. O catálogo e o ranking são compartilhados no Redis; login, gravações e resultados pessoais não são cacheados.
 
 Jogo de atendimento consultivo com progresso e histórico locais. O ranking online é opcional: terminar uma partida **não** a publica automaticamente.
 
@@ -47,13 +47,21 @@ O build falha se algum valor faltar, evitando publicar um ranking parcialmente c
 
 ## Configurar o tempo de atendimento
 
-No repositório do GitHub, acesse **Settings → Secrets and variables → Actions → Variables → New repository variable** e crie `TEMPO_ATENDIMENTO_SEGUNDOS` com um número inteiro positivo em segundos. Por exemplo, `300` corresponde a **5 minutos** para cada cliente.
+Cada atendimento tem **4 minutos (240 segundos)**. O workflow de publicação define `TEMPO_ATENDIMENTO_SEGUNDOS: 240`; para alterar o limite publicado, edite esse valor no arquivo em `.github/workflows/` e publique novamente. Os avisos de demora e a expulsão do atendimento acompanham esse limite.
 
-Após mudar o valor, execute novamente o workflow de publicação para atualizar o site. Se a variável não estiver definida, o limite padrão é `300` segundos. Os avisos de demora e a expulsão do atendimento acompanham esse limite.
+Para testar localmente, adicione `TEMPO_ATENDIMENTO_SEGUNDOS=240` ao `.env` e execute novamente `node scripts/build-firebase-config.mjs`. Sem configuração, o limite padrão também é de 240 segundos.
 
-Para testar localmente, adicione `TEMPO_ATENDIMENTO_SEGUNDOS=300` ao `.env` e execute novamente `node scripts/build-firebase-config.mjs`.
+As mensagens aparecem a 30 ms por caractere, com pausas na pontuação. Use “Mostrar mensagem inteira” para completar o texto e “Li a mensagem · Continuar” para avançar após ler. As falas de resposta permanecem visíveis até essa confirmação, sem avanço ou rolagem automáticos. O cronômetro de 4 minutos continua correndo durante a exibição das falas, a confirmação de leitura e as escolhas de resposta. A escolha de produtos continua pausando o tempo. Pausa, Enter/espaço e movimento reduzido continuam funcionando.
 
-As mensagens aparecem a 30 ms por caractere, com pausas na pontuação. Use “Mostrar mensagem inteira” para completar o texto e “Li a mensagem · Continuar” para avançar após ler. As falas de resposta permanecem visíveis até essa confirmação, sem avanço ou rolagem automáticos. O cronômetro de 5 minutos fica parado durante a exibição e a confirmação de leitura e volta nas escolhas de resposta. Pausa, Enter/espaço e movimento reduzido continuam funcionando.
+## Respostas, pontuação e cutscene de sucesso
+
+Cada rodada exibe **quatro respostas diferentes**, em ordem aleatória. Pelo menos uma vale **mais de 8 pontos (9 ou 10)**; as outras três são sorteadas de todo o banco da etapa, sem quantidade fixa por faixa de nota. As opções sorteadas são preservadas ao retomar uma partida salva.
+
+O destaque “+ pontos” no resultado do atendimento usa a **nota geral**, e não apenas os pontos de diálogo. Por exemplo, com diálogo 83/100, produtos 60/100 e nota geral 75/100, o destaque mostra **+75 pontos**. Nos atendimentos completos, a nota geral combina **65% de diálogo e 35% de produtos**. O total salvo continua na escala de **400 pontos**: cada nota geral é convertida para até 80 pontos, somando os cinco clientes. O resumo da partida em andamento usa a mesma conversão da nota geral.
+
+A cutscene de sucesso aparece ao atingir 400 pontos ou ao concluir os **cinco atendimentos escolhendo as melhores respostas disponíveis e os melhores produtos**. Se a melhor resposta sorteada valer 9, escolhê-la também conta para esse critério; empates na maior nota disponível são aceitos. Isso permite liberar a cena mesmo quando o sorteio não oferece respostas de 10 pontos. As notas e a pontuação do ranking não são aumentadas por essa regra. Atendimento parcial ou encerrado por tempo esgotado não cumpre o novo critério.
+
+Partidas antigas mantêm as opções já sorteadas. Respostas antigas sem registro da maior nota disponível só contam para o novo critério quando valem 10 pontos.
 
 ## Limite de segurança do ranking
 
@@ -71,7 +79,7 @@ Cada atendimento monta uma refeição em cinco etapas: **entrada, prato principa
 
 As escolhas ficam entre as últimas cinco falas do diálogo original: Lucas d2–d6, Marina d3–d7, Rafael d4–d8, Camila d5–d9 e André d6–d10. O jogador indica um produto por categoria, informa a quantidade, recebe a avaliação e continua respondendo às opções originais do atendimento. A próxima avaliação leva as indicações anteriores junto ao diálogo e à ficha de escuta. As fichas são reconstruídas pelo serviço de catálogo a partir dos IDs e do cache Redis; não usa nomes ou propriedades enviados pelo jogador.
 
-O painel apresenta as cinco opções em uma página. Categorias sem cinco alimentos com foto mostram somente o acervo real; uma categoria vazia pode ser pulada sem impedir a conversa. O jogador também pode decidir não sugerir uma categoria. Cada indicação e sua nota são salvas na retomada; uma avaliação já recebida não solicita novamente a avaliação ao restaurar a partida. A pontuação original das respostas continua na escala de 400 pontos; a adequação de cada alimento usa a escala independente de 0 a 1000.
+O painel apresenta as cinco opções em uma página. Categorias sem cinco alimentos com foto mostram somente o acervo real; uma categoria vazia pode ser pulada sem impedir a conversa. O jogador também pode decidir não sugerir uma categoria. Cada indicação e sua nota são salvas na retomada; uma avaliação já recebida não solicita novamente a avaliação ao restaurar a partida. A pontuação total baseada na nota geral continua na escala de 400 pontos; a adequação de cada alimento usa a escala independente de 0 a 1000.
 
 É necessário entrar ou criar uma conta Firebase para consultar a API. O cronômetro fica parado durante a comparação, autenticação e avaliação. Se o serviço ficar indisponível, o jogador pode tentar novamente ou continuar sem avaliação; o jogo não inventa uma nota. As escolhas anteriores e a avaliação atual são salvas na retomada. Partidas antigas sem histórico detalhado passam a oferecer produtos a partir do próximo atendimento.
 

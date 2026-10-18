@@ -35,7 +35,7 @@ jobs:
 
       - name: Gerar configuração do jogo e Firebase
         env:
-          TEMPO_ATENDIMENTO_SEGUNDOS: ${{ vars.TEMPO_ATENDIMENTO_SEGUNDOS }}
+          TEMPO_ATENDIMENTO_SEGUNDOS: 240
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
           FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}

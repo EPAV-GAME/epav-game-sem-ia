@@ -7,10 +7,11 @@ function reading(reducedMotion=false) {
   const source=readFileSync(new URL('../js/game.js',import.meta.url),'utf8');
   const part=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
   const button={hidden:true,textContent:''};
+  const modals = {'modal':{hidden:true},'modal-produtos':{hidden:true}};
   let tasks=[];
   const context=vm.createContext({
     window:{matchMedia:()=>({matches:reducedMotion})},
-    document:{hidden:false,querySelector:()=>({id:'tela-dialogo'}),getElementById:id=>id==='botao-leitura'?button:{hidden:true}},
+    document:{hidden:false,querySelector:()=>({id:'tela-dialogo'}),getElementById:id=>id==='botao-leitura'?button:modals[id]},
     estado:{clienteAtual:{},atendimentoExpulso:false},
     jogoPausado:false,elementoDigitacao:null,concluirDigitacaoAtual:null,
     proximaAcaoLeitura:null,temporizadorDigitacao:null,
@@ -22,22 +23,22 @@ function reading(reducedMotion=false) {
   vm.runInContext(part('function deveContarTempoAtendimento()','function sincronizarTempoAtendimento()')+
     part('function cancelarDigitacao()','function framesAndandoAtuais()'),context);
   const element={textContent:'',scrollTop:0,scrollHeight:500,closest:()=>null,classList:{add(){},remove(){}}};
-  return {context,button,element,flush:()=>{while(tasks.length)tasks.shift().fn();},pending:()=>tasks.length};
+  return {context,button,element,modals,flush:()=>{while(tasks.length)tasks.shift().fn();},pending:()=>tasks.length};
 }
 
-test('a completed message remains visible until confirmed, without consuming decision time or advancing twice',()=>{
+test('a completed message remains visible until confirmed, while consuming attendance time without advancing twice',()=>{
   const {context:c,button,element,flush,pending}=reading();
   let advanced=0;
   assert.equal(c.deveContarTempoAtendimento(),true);
   c.digitarTexto(element,'Mensagem longa para ler com calma.',()=>c.aguardarLeitura(()=>advanced++));
-  assert.equal(c.deveContarTempoAtendimento(),false);
+  assert.equal(c.deveContarTempoAtendimento(),true);
   flush();
   assert.equal(pending(),0);
   assert.equal(advanced,0);
   assert.equal(element.textContent,'Mensagem longa para ler com calma.');
   assert.equal(element.scrollTop,0);
   assert.match(button.textContent,/Continuar/);
-  assert.equal(c.deveContarTempoAtendimento(),false);
+  assert.equal(c.deveContarTempoAtendimento(),true);
   assert.equal(c.avancarLeitura(),true);
   assert.equal(advanced,1);
   assert.equal(c.avancarLeitura(),false);
@@ -73,4 +74,18 @@ test('reduced motion still requires reading confirmation, and leaving the scene 
   assert.equal(button.hidden,true);
   assert.equal(c.avancarLeitura(),false);
   assert.equal(advanced,0);
+});
+
+test('product selection and explicit pause stop attendance time during dialogue reading',()=>{
+  const {context:c,element,modals}=reading();
+  c.digitarTexto(element,'Mensagem em andamento.',()=>{});
+  assert.equal(c.deveContarTempoAtendimento(),true);
+  modals['modal-produtos'].hidden=false;
+  assert.equal(c.deveContarTempoAtendimento(),false);
+  modals['modal-produtos'].hidden=true;
+  assert.equal(c.deveContarTempoAtendimento(),true);
+  c.jogoPausado=true;
+  assert.equal(c.deveContarTempoAtendimento(),false);
+  c.jogoPausado=false;
+  assert.equal(c.deveContarTempoAtendimento(),true);
 });

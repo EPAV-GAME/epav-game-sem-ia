@@ -38,8 +38,8 @@ test('all clients can complete five products; dialogue mentions the actual selec
    const resumed=JSON.parse(JSON.stringify(state));
    assert.deepEqual(proximaCena(client,resumed,()=>.9).alternativas.map(o=>o.id),ids);
    assert.equal(scene.alternativas.length,4);
-   const good=scene.alternativas.filter(o=>stage.alternativas_cadastradas.find(a=>a.id===o.id).pontos>=8);
-   assert.ok(good.length>=2);
+   const good=scene.alternativas.filter(o=>stage.alternativas_cadastradas.find(a=>a.id===o.id).pontos>8);
+   assert.ok(good.length>=1);
    escolher(client,state,stage.id,good[0].id);
   }
   const assessment=resultado(state);
@@ -79,4 +79,64 @@ test('the screen adapter uses the same confidence meter as timer penalties and r
  const resumed=app.EpavPopup.preparar(client.dialogo[state.noAtual],state);
  assert.equal(state.roteiroPopup.confianca,20);
  assert.deepEqual([...initial.opcoes].map(o=>o.id),[...resumed.opcoes].map(o=>o.id));
+});
+
+test('best available dialogue choices qualify for success even when the draw omits ten points',()=>{
+ let belowPerfect=false;
+ for(const client of Object.values(bank)) {
+  const state=criarEstado(client,()=>0);
+  while(!state.encerrado) {
+   const stage=client.etapas[state.etapaIndex];
+   let scene=proximaCena(client,state,()=>0);
+   if(scene.tipo==='popup_produtos') {
+    const ideal=client.escolha_produtos_popup[scene.categoria].opcoes.find(p=>p.pontuacao===10);
+    escolherProduto(client,state,stage.id,ideal.codigo);
+    scene=proximaCena(client,state,()=>0);
+   }
+   const best=scene.alternativas.map(o=>stage.alternativas_cadastradas.find(a=>a.id===o.id))
+    .sort((a,b)=>b.pontos-a.pontos)[0];
+   escolher(client,state,stage.id,best.id);
+  }
+  const score=resultado(state);
+  assert.equal(score.melhoresEscolhas,true);
+  if(score.notaGeral<100)belowPerfect=true;
+  const restored=JSON.parse(JSON.stringify(state));
+  assert.equal(resultado(restored).melhoresEscolhas,true);
+  restored.respostas[0].pontos--;
+  assert.equal(resultado(restored).melhoresEscolhas,false);
+  const wrongProduct=JSON.parse(JSON.stringify(state));
+  Object.values(wrongProduct.produtosEscolhidos)[0].pontos=7;
+  assert.equal(resultado(wrongProduct).melhoresEscolhas,false);
+  state.motivoEncerramento='Retorno futuro respeitoso, sem venda';
+  assert.equal(resultado(state).melhoresEscolhas,false);
+ }
+ assert.equal(belowPerfect,true);
+});
+
+test('varied draws always include a score above eight, keep unique choices and persist on resume',()=>{
+ const browser=vm.createContext({});
+ vm.runInContext(readFileSync(new URL('../js/popup-engine.js',import.meta.url),'utf8'),browser);
+ for(const engine of [{criarEstado,proximaCena},browser.EpavPopupMotor]) {
+  for(const client of Object.values(bank)) {
+   for(let index=0;index<client.etapas.length;index++) {
+    const stage=client.etapas[index],combinations=new Set();
+    for(let seed=1;seed<=30;seed++) {
+     let value=seed;
+     const rng=()=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296;};
+     const state=engine.criarEstado(client,rng);
+     state.etapaIndex=index;
+     if(stage.popup_produtos_ref)state.produtosEscolhidos[stage.popup_produtos_ref]={pontos:10,nome:'Produto'};
+     const scene=engine.proximaCena(client,state,rng);
+     const ids=Array.from(scene.alternativas,o=>o.id);
+     assert.equal(ids.length,4);
+     assert.equal(new Set(ids).size,4);
+     assert.ok(ids.some(id=>stage.alternativas_cadastradas.find(a=>a.id===id).pontos>8));
+     combinations.add([...ids].sort().join(','));
+     const restored=JSON.parse(JSON.stringify(state));
+     assert.deepEqual(Array.from(engine.proximaCena(client,restored,rng).alternativas,o=>o.id),ids);
+    }
+    assert.ok(combinations.size>1);
+   }
+  }
+ }
 });

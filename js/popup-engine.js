@@ -39,12 +39,12 @@ function proximaCena(cliente,estado,rng=Math.random){
       opcoes:embaralhar(popup.opcoes,rng).map(p=>({codigo:p.codigo,nome:p.nome,id:p.id}))};
   }
   const grupo=etapa.alternativas_cadastradas;
-  const fortes=embaralhar(grupo.filter(a=>a.pontos>=8),rng);
-  const medias=embaralhar(grupo.filter(a=>a.pontos>=4&&a.pontos<8),rng);
-  const desafios=embaralhar(grupo.filter(a=>a.pontos<4),rng);
-  let opcoes=[...fortes.slice(0,2),...medias.slice(0,1),...desafios.slice(0,1)];
-  const ids=new Set(opcoes.map(a=>a.id));
-  for(const a of embaralhar(grupo,rng)){if(opcoes.length>=4)break;if(!ids.has(a.id)){opcoes.push(a);ids.add(a.id)}}
+  // Garanta uma resposta acima de 8; as demais vêm de todo o banco, sem faixas fixas.
+  const fortes=embaralhar(grupo.filter(a=>a.pontos>8),rng);
+  const garantida=fortes[0];
+  let opcoes=garantida
+    ? [garantida,...embaralhar(grupo.filter(a=>a.id!==garantida.id),rng).slice(0,3)]
+    : embaralhar(grupo,rng).slice(0,4);
   const anteriores=estado.historicoAlternativas[etapa.id];
   opcoes=anteriores?.length===4?anteriores.map(id=>grupo.find(o=>o.id===id)):embaralhar(opcoes,rng);
   estado.historicoAlternativas[etapa.id]=opcoes.map(o=>o.id);
@@ -116,7 +116,9 @@ function escolher(cliente,estado,etapaId,idAlternativa){
   estado.confianca=limitar(estado.confianca+escolha.variacao_confianca+(p&&p.pontos<=3?-4:0),0,100);
   const h=escolha.habilidade_avaliada;
   estado.porHabilidade[h]=(estado.porHabilidade[h]||0)+pontosAplicados;
-  estado.respostas.push({etapa:etapa.id,alternativa:escolha.id,pontos:pontosAplicados,habilidade:h,avisos});
+  const maximoDisponivel=Math.max(...estado.historicoAlternativas[etapaId]
+    .map(id=>etapa.alternativas_cadastradas.find(a=>a.id===id).pontos));
+  estado.respostas.push({etapa:etapa.id,alternativa:escolha.id,pontos:pontosAplicados,maximoDisponivel,habilidade:h,avisos});
   for(const f of escolha.revelar_ao_escolher){if(!estado.revelacoes.includes(f))estado.revelacoes.push(f)}
   const respeitarLimite=(etapa.etapa==='objection'&&escolha.intencao==='limite'&&estado.confianca<45)||
    (etapa.etapa==='start'&&estado.cenario===2&&escolha.intencao==='respeito'&&
@@ -137,7 +139,10 @@ function resultado(estado){
   const notaDialogo=qtdD?Math.round(estado.pontos/qtdD*10):0;
   const notaProdutos=qtdP?Math.round(estado.pontosProdutos/qtdP*10):0;
   const notaGeral=qtdD&&qtdP?Math.round(notaDialogo*0.65+notaProdutos*0.35):qtdD?notaDialogo:notaProdutos;
-  return {notaGeral:limitar(notaGeral,0,100),notaDialogos:limitar(notaDialogo,0,100),
+  const melhoresEscolhas=estado.motivoEncerramento==='Atendimento concluído' && qtdD>0 && qtdP===5
+    && estado.respostas.every(r=>r.pontos===(r.maximoDisponivel ?? 10))
+    && Object.values(estado.produtosEscolhidos).every(p=>p.pontos===10);
+  return {melhoresEscolhas,notaGeral:limitar(notaGeral,0,100),notaDialogos:limitar(notaDialogo,0,100),
     notaProdutos:limitar(notaProdutos,0,100),pontosDialogos:estado.pontos,
     pontosProdutos:estado.pontosProdutos,decisoesDialogo:qtdD,produtosSelecionados:qtdP,
     escolhasProdutos:estado.produtosEscolhidos,porHabilidade:estado.porHabilidade,
