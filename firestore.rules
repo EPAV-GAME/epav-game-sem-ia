@@ -128,7 +128,7 @@ service cloud.firestore {
         && request.resource.data.nome.size() <= 20
         && request.resource.data.pontos is int
         && request.resource.data.pontos >= 0
-        && request.resource.data.pontos <= 400
+        && request.resource.data.pontos <= 500
         && request.resource.data.qualidadeQuartos is int
         && request.resource.data.qualidadeQuartos >= 0
         && request.resource.data.qualidadeQuartos <= 160

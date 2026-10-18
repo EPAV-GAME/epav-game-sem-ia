@@ -93,7 +93,7 @@
     elemento('conta-publicar').disabled = !tentativaPendente || !usuario || publicando;
     const tentativa = tentativaPendente ? obterTentativaParaRanking(tentativaPendente) : null;
     elemento('conta-publicacao-resumo').textContent = tentativa
-      ? `${tentativa.nome} · ${tentativa.pontos}/400 pontos · tempo ${formatarTempoJogo(tentativa.tempoJogadoMs)}`
+      ? `${tentativa.nome} · ${tentativa.pontos}/500 pontos · tempo ${formatarTempoJogo(tentativa.tempoJogadoMs)}`
       : '';
     elemento('ranking-conta-texto').textContent = usuario
       ? `${usuario.email} · conta conectada`

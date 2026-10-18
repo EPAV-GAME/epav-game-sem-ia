@@ -1436,7 +1436,7 @@ function obterTentativaParaRanking(id = ultimaTentativaId) {
   return {
     id: tentativa.id,
     nome: String(tentativa.nomeVendedor || 'Vendedor').trim().slice(0, 20),
-    pontos: tentativa.maximo === 500 ? Math.round(tentativa.pontuacao * .8) : tentativa.pontuacao,
+    pontos: tentativa.pontuacao,
     qualidadeQuartos: Math.max(0,Math.min(160,Math.round((tentativa.indiceQualidade || 0)/(tentativa.maximoDecisoes || 40)*160))),
     satisfacao: Math.round(tentativa.satisfacaoMedia || 0),
     classificacao: String(tentativa.classificacao || '').slice(0, 40),

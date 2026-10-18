@@ -62,9 +62,9 @@ test('saved 97 and 81 grades restore as 178 and do not convert again on subseque
  assert.equal(c.lerProgresso().pontuacaoTotal,97);
 });
 
-test('ranking alone converts the 500 point total to its shared 400 point scale',()=>{
+test('ranking publishes the exact 500 point total without conversion',()=>{
  const c=vm.createContext({ultimaTentativaId:'test',lerHistorico:()=>[
   {id:'test',versao:7,maximo:500,pontuacao:500,tempoJogadoMs:1000} ]});
  load('obterTentativaParaRanking','marcarTentativaPublicada',c);
- assert.equal(c.obterTentativaParaRanking().pontos,400);
+ assert.equal(c.obterTentativaParaRanking().pontos,500);
 });
