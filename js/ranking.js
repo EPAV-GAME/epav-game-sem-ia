@@ -218,9 +218,8 @@
     lista.replaceChildren();
     status.textContent = 'Carregando resultados…';
     try {
-      await carregarServicos();
-      const { readRanking } = await import('./ranking-client.mjs?v=20261008-editions');
-      const resultados = await readRanking({ config: window.EPAV_FIREBASE_CONFIG, signal: AbortSignal.timeout(40000) });
+      const { readRanking } = await import('./ranking-client.mjs?v=20261122');
+      const resultados = await readRanking({ signal: AbortSignal.timeout(15000) });
       if (!resultados.length) {
         status.textContent = 'Ainda não há partidas publicadas. Você pode inaugurar o ranking!';
         return;

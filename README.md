@@ -11,6 +11,8 @@ Os jogos têm progresso e histórico locais separados. Ambos usam a mesma autent
 
 Jogo de atendimento consultivo com progresso e histórico locais. O ranking online é opcional: terminar uma partida **não** a publica automaticamente.
 
+As fichas públicas dos produtos fixos acompanham a publicação do jogo em `js/catalogo-popup.js`. O navegador abre as opções e calcula a nota localmente. As fotos são carregadas separadamente do Cloudflare. Para atualizar as fichas depois de mudanças no catálogo, execute `node scripts/update-popup-catalog.mjs` com `EPAV_CATALOG_ID_TOKEN` definido no ambiente e publique o arquivo gerado. Remova o token do ambiente após a atualização.
+
 ## Rodar localmente
 
 1. Copie `.env.example` para `.env` e preencha os dados do app Web do Firebase `epav-game`. O arquivo `.env` não entra no Git.

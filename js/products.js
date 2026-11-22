@@ -13,6 +13,7 @@
     onProducts: products => products.filter(p=>p.imagem_url).forEach(product => window.EpavImagens.carregar(product.imagem_url))
   }));
   function prepare(context) {
+    if (context.roteiro === 'popup-v1') return;
     loader().then(cache => cache.load(context)).catch(() => {});
   }
   function status(text) { $('produtos-status').textContent = text; }
@@ -40,15 +41,6 @@
   function failure(error, retry) {
     const login = error.message === 'LOGIN';
     if (login) session.repetirDepoisLogin = retry;
-    if(session.contexto.roteiro==='popup-v1') {
-      session.produtos=embaralharOpcoes(window.EpavPopup.cartoes(session.cliente,session.contexto.categoria));
-      session.pagina=0;
-      client().then(api=>{if(session)cards(session.produtos,api);});
-      $('produtos-form').hidden=false;
-      status(login?'Entre para carregar as fotos. Você também pode comparar as cinco opções do roteiro abaixo.':'As fotos estão indisponíveis agora. As cinco opções do roteiro continuam disponíveis para a atividade.');
-      $('produtos-acoes').replaceChildren(button(login?'Entrar para ver as fotos':'Tentar carregar fotos',login?()=>{modal.inert=true;window.EpavRanking.abrirConta({finalidade:'produtos'});}:retry,true));
-      return;
-    }
     status(login ? 'Entre ou crie uma conta para consultar os produtos e receber a avaliação.'
       : error.message === 'CATALOG_QUOTA_EXCEEDED'
         ? 'O banco de produtos atingiu o limite de consultas. Tente novamente quando ele estiver disponível ou continue sem avaliação.'
@@ -61,10 +53,12 @@
       button(login ? 'Entrar ou criar conta' : 'Tentar novamente', login ? () => { modal.inert = true; window.EpavRanking.abrirConta({ finalidade: 'produtos' }); } : retry),
       button('Continuar sem avaliação', () => finish({ noId: session.contexto.no_atual, status: 'indisponivel' }), true));
   }
-  function photo(product, api) {
+  const bucketPhoto = value => typeof value === 'string' &&
+    /^https:\/\/epav-swift-images\.kevinernandes2012\.workers\.dev\/images\/swift\/[a-f0-9]{64}\.webp$/.test(value) ? value : null;
+  function photo(product) {
     const box = document.createElement('div'); box.className = 'produto-foto';
     const placeholder = document.createElement('span'); placeholder.textContent = 'Carregando foto…'; box.append(placeholder);
-    const url = api.productImageUrl(product.imagem_url);
+    const url = bucketPhoto(product.imagem_url);
     if(!url)placeholder.textContent='Foto ainda não disponível';
     if (url) {
       const image = document.createElement('img'); image.width = 512; image.height = 512;
@@ -77,7 +71,7 @@
     }
     return box;
   }
-  function cards(products, api) {
+  function cards(products) {
     $('produtos-paginacao').hidden=session.contexto.roteiro==='popup-v1';
     const fragment = document.createDocumentFragment();
     const start=(session.pagina || 0)*5;
@@ -96,7 +90,7 @@
         $('produto-selecionado').textContent='Selecionado: '+product.nome;
       };
       const title = document.createElement('strong'); title.textContent = `${index + 1}. ${product.nome}`;
-      label.append(radio, title); card.append(photo(product, api), label);
+      label.append(radio, title); card.append(photo(product), label);
       const details = document.createElement('details');
       const summary = document.createElement('summary'); summary.textContent = 'Ver ficha do produto';
       const fields = document.createElement('dl');
@@ -118,8 +112,8 @@
     $('produtos-lista').replaceChildren(fragment);
     const page=session.pagina || 0, pages=Math.ceil(products.length/5);
     const caption=document.createElement('span'); caption.textContent=`Opções ${start+1}–${Math.min(start+5,products.length)} de ${products.length}`;
-    const previous=button('← Anteriores',()=>{session.pagina--;cards(products,api);},true);
-    const next=button('Mais opções →',()=>{session.pagina++;cards(products,api);},true);
+    const previous=button('← Anteriores',()=>{session.pagina--;cards(products);},true);
+    const next=button('Mais opções →',()=>{session.pagina++;cards(products);},true);
     previous.disabled=page===0;next.disabled=page+1>=pages;
     $('produtos-paginacao').replaceChildren(previous,caption,next);
   }
@@ -131,7 +125,7 @@
     try {
       const result = await (await loader()).load(active.contexto);
       if (session !== active) return;
-      active.produtos = active.contexto.roteiro==='popup-v1'?embaralharOpcoes(result.produtos):result.produtos;
+      active.produtos = result.produtos;
       active.pagina=0;active.escolhido=null;
       $('produto-selecionado').textContent='';
       $('produtos-contexto').textContent = `${active.cliente.perfil} ${result.ficha_escuta.join(' · ')}`;
@@ -140,12 +134,22 @@
         $('produtos-acoes').replaceChildren(button('Continuar conversa',()=>finish({noId:active.contexto.no_atual,status:'sem_catalogo'})));
         return;
       }
-      cards(active.produtos, await client());
+      cards(active.produtos);
       $('produtos-form').reset(); $('produtos-form').hidden = false;
       status('Cinco opções do roteiro. Consulte a ficha e clique no produto para receber o feedback. Escolher uma proposta não confirma uma compra.');
       $('produtos-acoes').replaceChildren();
     } catch (error) { if (session === active && error.name !== 'AbortError') failure(error, load); }
     finally { if (session === active) busy = false; }
+  }
+  function loadFixedProducts(active) {
+    active.produtos = embaralharOpcoes(window.EpavPopup.cartoes(active.cliente, active.contexto.categoria));
+    active.pagina = 0;
+    active.escolhido = null;
+    $('produto-selecionado').textContent = '';
+    cards(active.produtos);
+    $('produtos-form').reset();
+    $('produtos-form').hidden = false;
+    status('Consulte a ficha e escolha um produto para receber o feedback.');
   }
   async function evaluate(event) {
     event?.preventDefault();
@@ -220,7 +224,9 @@
     $('produtos-lista').replaceChildren(); $('produtos-acoes').replaceChildren();
     modal.hidden = false; $('jogo').inert = true;
     sincronizarCronometro(); $('produtos-titulo').focus();
-    if (options.registro?.status === 'avaliado') showResult(options.registro); else load();
+    if (options.registro?.status === 'avaliado') showResult(options.registro);
+    else if (options.contexto.roteiro === 'popup-v1') loadFixedProducts(options);
+    else load();
   }
   $('produtos-form').addEventListener('submit', evaluate);
   window.addEventListener('epav-conta-fechada', () => {

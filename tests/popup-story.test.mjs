@@ -6,6 +6,18 @@ import {criarEstado,proximaCena,escolherProduto,escolher,resultado} from '../js/
 const ctx=vm.createContext({});
 vm.runInContext(readFileSync(new URL('../js/popup-data.js',import.meta.url),'utf8'),ctx);
 const bank=ctx.EpavPopupDados;
+test('static catalog covers all teaching SKUs and publishes only public fields',()=>{
+ const snapshot={window:{}};
+ vm.runInNewContext(readFileSync(new URL('../js/catalogo-popup.js',import.meta.url),'utf8'),snapshot);
+ const catalog=snapshot.window.EPAV_POPUP_CATALOG;
+ const codes=new Set(Object.values(bank).flatMap(client=>Object.values(client.escolha_produtos_popup)
+  .flatMap(popup=>popup.opcoes.map(option=>String(option.codigo)))));
+ assert.deepEqual(Object.keys(catalog).sort(),[...codes].sort());
+ for(const card of Object.values(catalog)){
+  assert.deepEqual(Object.keys(card).sort(),['formato','imagem_url','marca','ocasioes','peso_embalagem_kg','tiposProduto','unidade_medida']);
+  if(card.imagem_url)assert.match(card.imagem_url,/^https:\/\/epav-swift-images\.kevinernandes2012\.workers\.dev\/images\/swift\/[a-f0-9]{64}\.webp$/);
+ }
+});
 test('every teaching group has exactly five fixed SKUs with concealed classifications and scores',()=>{
  for(const client of Object.values(bank)) {
   assert.ok(client.etapas.every(e=>e.alternativas_cadastradas.length>=8));

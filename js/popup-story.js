@@ -65,6 +65,7 @@
  globalThis.EpavPopup={iniciar,preparar,produto,escolher,referencias,
   cartoes:(cliente,category)=>dados(cliente).escolha_produtos_popup[category].opcoes.map(p=>({
    id:String(p.codigo),codigo:String(p.codigo),nome:p.nome,marca:'Swift',tiposProduto:[],ocasioes:[],
-   formato:null,unidade_medida:null,peso_embalagem_kg:null,imagem_url:null})),
+   formato:null,unidade_medida:null,peso_embalagem_kg:null,imagem_url:null,
+   ...globalThis.EPAV_POPUP_CATALOG?.[String(p.codigo)]})),
   resultado:estado=>motor.resultado(roteiro(estado))};
 })();
